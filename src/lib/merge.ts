@@ -35,7 +35,9 @@ export interface ExcelSnapshot {
 
 function cellToString(value: ExcelJS.CellValue): string {
   if (value === null || value === undefined) return "";
-  if (value instanceof Date) return value.toISOString().slice(0, 10);
+  if (value instanceof Date) {
+    return Number.isNaN(value.getTime()) ? "" : value.toISOString().slice(0, 10);
+  }
   if (typeof value === "object") {
     // Formule, rich text, hyperlink, ecc: usa il risultato/testo calcolato quando disponibile.
     if ("result" in value) return cellToString(value.result as ExcelJS.CellValue);

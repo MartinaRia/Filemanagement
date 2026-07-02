@@ -18,13 +18,14 @@ export default function SettingsForm({ initialConfig, initialColumnDefs }: Props
   const [config, setConfig] = useState<AppConfig>(initialConfig);
   const [columnDefs, setColumnDefs] = useState<CustomColumnDef[]>(initialColumnDefs);
   const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState<string | null>(null);
+  const [configMessage, setConfigMessage] = useState<string | null>(null);
+  const [columnMessage, setColumnMessage] = useState<string | null>(null);
   const [newColumn, setNewColumn] = useState({ key: "", label: "", type: "text", options: "" });
 
   async function handleSaveConfig(e: React.FormEvent) {
     e.preventDefault();
     setSaving(true);
-    setMessage(null);
+    setConfigMessage(null);
     try {
       const res = await fetch("/api/config", {
         method: "PUT",
@@ -33,10 +34,10 @@ export default function SettingsForm({ initialConfig, initialColumnDefs }: Props
       });
       const body = await res.json();
       if (!res.ok) {
-        setMessage(`Errore: ${JSON.stringify(body.error)}`);
+        setConfigMessage(`Errore: ${JSON.stringify(body.error)}`);
         return;
       }
-      setMessage("Configurazione salvata.");
+      setConfigMessage("Configurazione salvata.");
     } finally {
       setSaving(false);
     }
@@ -44,6 +45,7 @@ export default function SettingsForm({ initialConfig, initialColumnDefs }: Props
 
   async function handleAddColumn(e: React.FormEvent) {
     e.preventDefault();
+    setColumnMessage(null);
     const res = await fetch("/api/config/columns", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -59,7 +61,7 @@ export default function SettingsForm({ initialConfig, initialColumnDefs }: Props
     });
     const body = await res.json();
     if (!res.ok) {
-      setMessage(`Errore: ${JSON.stringify(body.error)}`);
+      setColumnMessage(`Errore: ${JSON.stringify(body.error)}`);
       return;
     }
     setColumnDefs((prev) => [...prev, body.column]);
@@ -109,7 +111,7 @@ export default function SettingsForm({ initialConfig, initialColumnDefs }: Props
           >
             {saving ? "Salvataggio..." : "Salva"}
           </button>
-          {message && <p className="text-sm text-gray-600">{message}</p>}
+          {configMessage && <p className="text-sm text-gray-600">{configMessage}</p>}
         </form>
       </section>
 
@@ -141,7 +143,7 @@ export default function SettingsForm({ initialConfig, initialColumnDefs }: Props
         <form onSubmit={handleAddColumn} className="grid grid-cols-2 gap-2 sm:grid-cols-5">
           <input
             required
-            placeholder="chiave (es. note)"
+            placeholder="chiave (es. note, senza spazi)"
             value={newColumn.key}
             onChange={(e) => setNewColumn({ ...newColumn, key: e.target.value })}
             className="col-span-1 rounded-md border border-gray-300 px-2 py-1.5 text-sm"
@@ -180,6 +182,7 @@ export default function SettingsForm({ initialConfig, initialColumnDefs }: Props
             Aggiungi
           </button>
         </form>
+        {columnMessage && <p className="mt-2 text-sm text-gray-600">{columnMessage}</p>}
       </section>
     </main>
   );

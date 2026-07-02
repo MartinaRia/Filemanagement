@@ -1,0 +1,61 @@
+// Schema del database: separa i dati "sorgente" (dall'ultimo file Excel
+// caricato manualmente, sola lettura) dai dati "custom" (note/colonne
+// aggiunte dall'utente, editabili). Il collegamento tra le due tabelle
+// avviene tramite rowKey, cosi' un nuovo caricamento del file non tocca mai
+// le colonne custom della stessa riga.
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+// Configurazione unica dell'app (singleton, id sempre 1)
+model AppConfig {
+  id            Int      @id @default(1)
+  worksheetName String? // nome del foglio da leggere nel file caricato (vuoto = primo foglio)
+  keyColumn     String? // lettera colonna usata come identificatore univoco riga (es. "A"). Se vuoto, si usa un hash del contenuto della riga
+  updatedAt     DateTime @updatedAt
+}
+
+// Definizione delle colonne custom (aggiunte dall'utente, a partire dalla colonna E)
+model CustomColumnDef {
+  id        String   @id @default(cuid())
+  key       String   @unique // chiave tecnica usata dentro il JSON di CustomRow.data
+  label     String // etichetta mostrata in tabella
+  type      String   @default("text") // text | textarea | select | date | number | checkbox
+  options   Json? // opzioni per il tipo "select": string[]
+  order     Int      @default(0)
+  createdAt DateTime @default(now())
+}
+
+// Ultimo snapshot noto dei dati sorgente (dall'ultimo file caricato), sola lettura per l'utente
+model SourceRow {
+  rowKey     String   @id
+  rowIndex   Int // posizione originale nel foglio, per un ordinamento di default coerente
+  data       Json // { "A": "...", "B": "...", ... } sola le colonne read-only
+  lastSeenAt DateTime @updatedAt
+  createdAt  DateTime @default(now())
+}
+
+// Dati aggiunti dall'utente per riga: sopravvivono ad ogni nuovo caricamento del file
+model CustomRow {
+  rowKey    String   @id
+  data      Json // { "note": "...", "priorita": "...", ... } chiavi = CustomColumnDef.key
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
+// Storico dei caricamenti manuali del file Excel
+model UploadLog {
+  id         String    @id @default(cuid())
+  status     String // "ok" | "error"
+  message    String?
+  rowCount   Int?
+  fileName   String?
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+}

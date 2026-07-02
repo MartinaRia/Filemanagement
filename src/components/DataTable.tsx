@@ -46,7 +46,7 @@ export default function DataTable({ rows, columnDefs, sourceHeaders }: Props) {
         id: `src:${header}`,
         header,
         enableGrouping: true,
-        cell: (info) => <span className="text-gray-700">{info.getValue()}</span>,
+        cell: (info) => <span className="block truncate text-gray-700">{info.getValue()}</span>,
       })
     );
 
@@ -84,12 +84,22 @@ export default function DataTable({ rows, columnDefs, sourceHeaders }: Props) {
     getGroupedRowModel: getGroupedRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
     autoResetExpanded: false,
+    columnResizeMode: "onChange",
+    enableColumnResizing: true,
+    defaultColumn: { minSize: 90, size: 160 },
   });
 
   const groupableColumns = table.getAllLeafColumns().filter((c) => c.getCanGroup());
+  const filteredCount = table.getFilteredRowModel().rows.length;
+  const activeFilterCount = columnFilters.length + (globalFilter ? 1 : 0);
+
+  function resetFilters() {
+    setColumnFilters([]);
+    setGlobalFilter("");
+  }
 
   return (
-    <div className="flex min-w-0 flex-col gap-3">
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
         <input
           value={globalFilter}
@@ -114,26 +124,48 @@ export default function DataTable({ rows, columnDefs, sourceHeaders }: Props) {
           </select>
         </div>
 
-        <span className="ml-auto text-sm text-gray-400">{data.length} righe</span>
+        <div className="ml-auto flex items-center gap-2">
+          {activeFilterCount > 0 && (
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-blue-50 py-1 pr-1.5 pl-2.5 text-xs font-medium text-blue-700">
+              {activeFilterCount} {activeFilterCount === 1 ? "filtro attivo" : "filtri attivi"}
+              <button
+                onClick={resetFilters}
+                title="Rimuovi filtri"
+                className="flex h-4 w-4 items-center justify-center rounded-full text-blue-500 hover:bg-blue-100 hover:text-blue-800"
+              >
+                ✕
+              </button>
+            </span>
+          )}
+          <span className="text-sm text-gray-400">
+            {activeFilterCount > 0 ? `${filteredCount} di ${data.length} righe` : `${data.length} righe`}
+          </span>
+        </div>
       </div>
 
-      <div className="overflow-auto rounded-lg border border-gray-200 bg-white">
-        <table className="min-w-full border-collapse text-sm">
-          <thead className="sticky top-0 bg-gray-50">
+      <div className="min-h-0 flex-1 overflow-auto rounded-lg border border-gray-200 bg-white">
+        <table
+          className="border-collapse text-sm"
+          style={{ width: table.getTotalSize(), tableLayout: "fixed" }}
+        >
+          <thead className="sticky top-0 z-10 bg-gray-50 shadow-[0_1px_0_0] shadow-gray-200">
             {table.getHeaderGroups().map((hg) => (
               <tr key={hg.id}>
                 {hg.headers.map((header) => (
                   <th
                     key={header.id}
-                    className="border-b border-gray-200 px-3 py-2 text-left font-medium text-gray-600 select-none"
+                    style={{ width: header.getSize() }}
+                    className="relative border-b border-gray-200 px-3 py-2 text-left align-top text-xs font-semibold tracking-wide text-gray-500 uppercase select-none"
                   >
                     <div className="flex items-center gap-1">
                       <button
                         onClick={header.column.getToggleSortingHandler()}
-                        className="flex items-center gap-1 hover:text-gray-900"
+                        className="flex items-center gap-1 truncate hover:text-gray-900"
                         disabled={!header.column.getCanSort()}
                       >
-                        {flexRender(header.column.columnDef.header, header.getContext())}
+                        <span className="truncate">
+                          {flexRender(header.column.columnDef.header, header.getContext())}
+                        </span>
                         {{ asc: " ▲", desc: " ▼" }[header.column.getIsSorted() as string] ?? ""}
                       </button>
                       {header.column.getCanGroup() && (
@@ -153,7 +185,16 @@ export default function DataTable({ rows, columnDefs, sourceHeaders }: Props) {
                         value={(header.column.getFilterValue() as string) ?? ""}
                         onChange={(e) => header.column.setFilterValue(e.target.value)}
                         placeholder="Filtra..."
-                        className="mt-1 w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs font-normal focus:border-gray-400 focus:outline-none"
+                        className="mt-1 w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs font-normal normal-case focus:border-gray-400 focus:outline-none"
+                      />
+                    )}
+                    {header.column.getCanResize() && (
+                      <div
+                        onMouseDown={header.getResizeHandler()}
+                        onTouchStart={header.getResizeHandler()}
+                        className={`absolute top-0 right-0 h-full w-1.5 cursor-col-resize touch-none select-none hover:bg-blue-300 ${
+                          header.column.getIsResizing() ? "bg-blue-400" : ""
+                        }`}
                       />
                     )}
                   </th>
@@ -167,7 +208,11 @@ export default function DataTable({ rows, columnDefs, sourceHeaders }: Props) {
                 {row.getVisibleCells().map((cell) => {
                   if (cell.getIsGrouped()) {
                     return (
-                      <td key={cell.id} className="px-3 py-2 font-medium">
+                      <td
+                        key={cell.id}
+                        style={{ width: cell.column.getSize() }}
+                        className="h-10 px-3 align-middle font-medium"
+                      >
                         <button
                           onClick={row.getToggleExpandedHandler()}
                           className="flex items-center gap-1 text-gray-800"
@@ -180,10 +225,16 @@ export default function DataTable({ rows, columnDefs, sourceHeaders }: Props) {
                     );
                   }
                   if (cell.getIsAggregated() || cell.getIsPlaceholder()) {
-                    return <td key={cell.id} className="px-3 py-2" />;
+                    return (
+                      <td key={cell.id} style={{ width: cell.column.getSize() }} className="h-10 px-3" />
+                    );
                   }
                   return (
-                    <td key={cell.id} className="px-3 py-1.5 align-top">
+                    <td
+                      key={cell.id}
+                      style={{ width: cell.column.getSize() }}
+                      className="h-10 px-3 align-middle"
+                    >
                       {flexRender(cell.column.columnDef.cell, cell.getContext())}
                     </td>
                   );

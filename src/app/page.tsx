@@ -12,7 +12,7 @@ export default async function HomePage() {
     orderBy: { startedAt: "desc" },
   });
 
-  const { rows, columnDefs } = await getMergedRows();
+  const { rows, columnDefs, sourceHeaders } = await getMergedRows();
 
   if (!lastUpload) {
     return (
@@ -31,7 +31,7 @@ export default async function HomePage() {
   }
 
   return (
-    <main className="mx-auto flex w-full max-w-7xl flex-1 flex-col gap-4 p-6">
+    <main className="mx-auto flex w-full min-w-0 max-w-7xl flex-1 flex-col gap-4 p-6">
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-xl font-semibold">File Progetti</h1>
@@ -53,7 +53,7 @@ export default async function HomePage() {
         </div>
       </header>
 
-      <DataTable rows={rows} columnDefs={columnDefs} />
+      <DataTable rows={rows} columnDefs={columnDefs} sourceHeaders={sourceHeaders} />
     </main>
   );
 }

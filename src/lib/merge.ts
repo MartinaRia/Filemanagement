@@ -129,6 +129,12 @@ export async function applyUploadedWorkbook(
       where: { rowKey: { notIn: seenKeys.length ? seenKeys : ["__none__"] } },
     });
 
+    await prisma.appConfig.upsert({
+      where: { id: 1 },
+      create: { id: 1, sourceHeaders: snapshot.headers },
+      update: { sourceHeaders: snapshot.headers },
+    });
+
     await prisma.uploadLog.update({
       where: { id: log.id },
       data: { status: "ok", rowCount: snapshot.rows.length, finishedAt: new Date() },
@@ -161,10 +167,11 @@ export async function getColumnDefs(): Promise<CustomColumnDef[]> {
 }
 
 export async function getMergedRows() {
-  const [sourceRows, customRows, columnDefs] = await Promise.all([
+  const [sourceRows, customRows, columnDefs, config] = await Promise.all([
     prisma.sourceRow.findMany({ orderBy: { rowIndex: "asc" } }),
     prisma.customRow.findMany(),
     getColumnDefs(),
+    prisma.appConfig.findUnique({ where: { id: 1 } }),
   ]);
 
   const customByKey = new Map(customRows.map((c) => [c.rowKey, c.data as Record<string, unknown>]));
@@ -175,5 +182,11 @@ export async function getMergedRows() {
     custom: customByKey.get(s.rowKey) ?? {},
   }));
 
-  return { rows, columnDefs };
+  // sourceHeaders conserva l'ordine originale delle colonne del file caricato:
+  // le chiavi di un oggetto jsonb (SourceRow.data) non hanno ordine garantito in Postgres.
+  const sourceHeaders = config?.sourceHeaders?.length
+    ? config.sourceHeaders
+    : Array.from(new Set(rows.flatMap((r) => Object.keys(r.source))));
+
+  return { rows, columnDefs, sourceHeaders };
 }

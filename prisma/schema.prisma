@@ -18,6 +18,10 @@ model AppConfig {
   id            Int      @id @default(1)
   worksheetName String? // nome del foglio da leggere nel file caricato (vuoto = primo foglio)
   keyColumn     String? // lettera colonna usata come identificatore univoco riga (es. "A"). Se vuoto, si usa un hash del contenuto della riga
+  // Ordine delle intestazioni cosi' come lette dall'ultimo file caricato: un array Postgres
+  // nativo preserva l'ordine, a differenza delle chiavi di un oggetto jsonb (SourceRow.data),
+  // che Postgres puo' riordinare. Usato per mostrare le colonne nell'ordine originale del file.
+  sourceHeaders String[] @default([])
   updatedAt     DateTime @updatedAt
 }
 

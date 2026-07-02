@@ -22,9 +22,10 @@ const columnHelper = createColumnHelper<MergedRow>();
 interface Props {
   rows: MergedRow[];
   columnDefs: CustomColumnDef[];
+  sourceHeaders: string[];
 }
 
-export default function DataTable({ rows, columnDefs }: Props) {
+export default function DataTable({ rows, columnDefs, sourceHeaders }: Props) {
   const [data, setData] = useState(rows);
   const [sorting, setSorting] = useState<SortingState>([]);
   const [grouping, setGrouping] = useState<GroupingState>([]);
@@ -32,12 +33,6 @@ export default function DataTable({ rows, columnDefs }: Props) {
   const [globalFilter, setGlobalFilter] = useState("");
 
   useEffect(() => setData(rows), [rows]);
-
-  const sourceHeaders = useMemo(() => {
-    const headers = new Set<string>();
-    rows.forEach((r) => Object.keys(r.source).forEach((h) => headers.add(h)));
-    return Array.from(headers);
-  }, [rows]);
 
   function handleCellSaved(rowKey: string, key: string, value: unknown) {
     setData((prev) =>
@@ -94,7 +89,7 @@ export default function DataTable({ rows, columnDefs }: Props) {
   const groupableColumns = table.getAllLeafColumns().filter((c) => c.getCanGroup());
 
   return (
-    <div className="flex flex-col gap-3">
+    <div className="flex min-w-0 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-3">
         <input
           value={globalFilter}

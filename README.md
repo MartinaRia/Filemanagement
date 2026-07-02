@@ -48,11 +48,18 @@ caricare il primo file.
 ## 3. Deploy su Vercel (gratuito)
 
 1. Importa il repository su [vercel.com/new](https://vercel.com/new).
-2. Imposta le variabili d'ambiente di `.env.example` nelle Project Settings > Environment Variables.
-3. Deploy.
+2. Collega un database Postgres (es. da Vercel > Storage > Create Database > Neon): imposta
+   automaticamente `DATABASE_URL`.
+3. Imposta manualmente le altre variabili d'ambiente di `.env.example` (`APP_PASSWORD`, `SESSION_SECRET`)
+   nelle Project Settings > Environment Variables.
+4. Deploy.
 
-Non serve alcun piano a pagamento ne' configurazione di Cron Job: l'aggiornamento e' sempre manuale tramite
-il pulsante di upload.
+Il file `vercel.json` incluso imposta il comando di build su `prisma db push && next build`: le tabelle nel
+database vengono create/sincronizzate automaticamente ad ogni deploy, senza bisogno di eseguire comandi a
+mano contro il database di produzione.
+
+Non serve alcun piano a pagamento ne' configurazione di Cron Job: l'aggiornamento dei dati e' sempre
+manuale tramite il pulsante di upload.
 
 ## 4. Uso quotidiano
 

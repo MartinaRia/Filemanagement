@@ -8,16 +8,30 @@ import {
   getFilteredRowModel,
   getGroupedRowModel,
   getExpandedRowModel,
+  getFacetedRowModel,
+  getFacetedUniqueValues,
   createColumnHelper,
   flexRender,
   type SortingState,
   type GroupingState,
   type ColumnFiltersState,
+  type FilterFn,
 } from "@tanstack/react-table";
 import EditableCell from "@/components/EditableCell";
+import ColumnFilterMenu from "@/components/ColumnFilterMenu";
 import type { CustomColumnDef, MergedRow } from "@/lib/types";
 
 const columnHelper = createColumnHelper<MergedRow>();
+
+// Filtro a più termini/valori in OR: la riga passa se il valore della cella
+// contiene almeno uno dei termini selezionati (testo digitato o valore scelto
+// dalla lista dei valori univoci della colonna).
+const multiTermFilter: FilterFn<MergedRow> = (row, columnId, filterValue: string[]) => {
+  if (!filterValue || filterValue.length === 0) return true;
+  const cell = String(row.getValue(columnId) ?? "").toLowerCase();
+  return filterValue.some((term) => cell.includes(term.toLowerCase()));
+};
+multiTermFilter.autoRemove = (value: string[]) => !value || value.length === 0;
 
 interface Props {
   rows: MergedRow[];
@@ -46,6 +60,7 @@ export default function DataTable({ rows, columnDefs, sourceHeaders }: Props) {
         id: `src:${header}`,
         header,
         enableGrouping: true,
+        filterFn: multiTermFilter,
         cell: (info) => <span className="block truncate text-gray-700">{info.getValue()}</span>,
       })
     );
@@ -56,6 +71,7 @@ export default function DataTable({ rows, columnDefs, sourceHeaders }: Props) {
         header: def.label,
         enableGrouping: def.type === "select" || def.type === "checkbox",
         enableSorting: true,
+        filterFn: multiTermFilter,
         cell: (info) => (
           <EditableCell
             rowKey={info.row.original.rowKey}
@@ -83,6 +99,8 @@ export default function DataTable({ rows, columnDefs, sourceHeaders }: Props) {
     getFilteredRowModel: getFilteredRowModel(),
     getGroupedRowModel: getGroupedRowModel(),
     getExpandedRowModel: getExpandedRowModel(),
+    getFacetedRowModel: getFacetedRowModel(),
+    getFacetedUniqueValues: getFacetedUniqueValues(),
     autoResetExpanded: false,
     columnResizeMode: "onChange",
     enableColumnResizing: true,
@@ -180,14 +198,7 @@ export default function DataTable({ rows, columnDefs, sourceHeaders }: Props) {
                         </button>
                       )}
                     </div>
-                    {header.column.getCanFilter() && (
-                      <input
-                        value={(header.column.getFilterValue() as string) ?? ""}
-                        onChange={(e) => header.column.setFilterValue(e.target.value)}
-                        placeholder="Filtra..."
-                        className="mt-1 w-full rounded border border-gray-200 px-1.5 py-0.5 text-xs font-normal normal-case focus:border-gray-400 focus:outline-none"
-                      />
-                    )}
+                    {header.column.getCanFilter() && <ColumnFilterMenu column={header.column} />}
                     {header.column.getCanResize() && (
                       <div
                         onMouseDown={header.getResizeHandler()}

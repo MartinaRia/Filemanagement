@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { createSessionCookieValue, SESSION_COOKIE_NAME, SESSION_MAX_AGE } from "@/lib/session";
+import { createSessionCookieValue, Role, SESSION_COOKIE_NAME, SESSION_MAX_AGE } from "@/lib/session";
 
 export async function POST(req: NextRequest) {
   const { password } = await req.json();
@@ -11,12 +11,17 @@ export async function POST(req: NextRequest) {
     );
   }
 
-  if (password !== process.env.APP_PASSWORD) {
+  let role: Role;
+  if (password === process.env.APP_PASSWORD) {
+    role = "admin";
+  } else if (process.env.VIEWER_PASSWORD && password === process.env.VIEWER_PASSWORD) {
+    role = "viewer";
+  } else {
     return NextResponse.json({ error: "Password errata" }, { status: 401 });
   }
 
   const res = NextResponse.json({ ok: true });
-  res.cookies.set(SESSION_COOKIE_NAME, await createSessionCookieValue(), {
+  res.cookies.set(SESSION_COOKIE_NAME, await createSessionCookieValue(role), {
     httpOnly: true,
     secure: process.env.NODE_ENV === "production",
     sameSite: "lax",

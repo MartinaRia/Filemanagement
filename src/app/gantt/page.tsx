@@ -2,6 +2,7 @@ import Link from "next/link";
 import { getMergedRows } from "@/lib/merge";
 import { getCurrentRole } from "@/lib/session";
 import GanttChart from "@/components/GanttChart";
+import LogoutButton from "@/components/LogoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -33,6 +34,7 @@ export default async function GanttPage() {
               Impostazioni
             </Link>
           )}
+          <LogoutButton />
         </div>
       </header>
 

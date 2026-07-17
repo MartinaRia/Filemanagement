@@ -4,6 +4,7 @@ import { getMergedRows } from "@/lib/merge";
 import { getCurrentRole } from "@/lib/session";
 import DataTable from "@/components/DataTable";
 import UploadForm from "@/components/UploadForm";
+import LogoutButton from "@/components/LogoutButton";
 
 export const dynamic = "force-dynamic";
 
@@ -27,6 +28,7 @@ export default async function HomePage() {
           <p className="text-sm text-gray-500">
             Il caricamento del file non e&apos; ancora stato effettuato. Contatta un amministratore.
           </p>
+          <LogoutButton />
         </main>
       );
     }
@@ -73,6 +75,7 @@ export default async function HomePage() {
               Impostazioni
             </Link>
           )}
+          <LogoutButton />
         </div>
       </header>
 

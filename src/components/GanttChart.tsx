@@ -73,6 +73,7 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
   const statusMenuRef = useRef<HTMLDivElement>(null);
   const [dateFilterHeader, setDateFilterHeader] = useState("");
   const [dateFilterMonth, setDateFilterMonth] = useState("");
+  const [labelSort, setLabelSort] = useState<"none" | "asc" | "desc">("none");
 
   useEffect(() => {
     if (!statusMenuOpen) return;
@@ -201,6 +202,15 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
     .filter((entry) => entry.points.length > 0)
     .sort((a, b) => a.points[0].date.getTime() - b.points[0].date.getTime());
 
+  // Ordinamento per etichetta di riga (colonna scelta in "Etichetta riga:"):
+  // quando attivo sostituisce l'ordinamento cronologico di default.
+  if (labelSort !== "none") {
+    rowEntries.sort((a, b) => {
+      const cmp = a.label.localeCompare(b.label, "it", { numeric: true, sensitivity: "base" });
+      return labelSort === "asc" ? cmp : -cmp;
+    });
+  }
+
   const skippedCount = filteredRows.length - rowEntries.length;
 
   const ticks: { x: number; label: string }[] = [];
@@ -262,6 +272,22 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
               </option>
             ))}
           </select>
+          <button
+            type="button"
+            onClick={() =>
+              setLabelSort((s) => (s === "none" ? "asc" : s === "asc" ? "desc" : "none"))
+            }
+            title="Ordina per l'etichetta di riga"
+            className={`rounded-md border px-2 py-1 text-sm ${
+              labelSort !== "none"
+                ? "border-blue-300 bg-blue-50 text-blue-700"
+                : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+            }`}
+          >
+            {labelSort === "asc" && "A → Z ▲"}
+            {labelSort === "desc" && "Z → A ▼"}
+            {labelSort === "none" && "Ordina ↕"}
+          </button>
         </div>
 
         <StatusFilter

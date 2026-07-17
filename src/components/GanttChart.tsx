@@ -226,6 +226,26 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
     }
   }
 
+  // Bande alternate per mese (gennaio/marzo/... vs febbraio/aprile/...), a
+  // prescindere dal livello di zoom: solo i mesi "pari" (Feb, Apr, ...)
+  // ricevono una tinta, i mesi "dispari" restano sullo sfondo bianco.
+  const monthBands: { key: string; x: number; width: number }[] = [];
+  {
+    const cursor = new Date(minDate.getFullYear(), minDate.getMonth(), 1);
+    while (cursor <= maxDate) {
+      if (cursor.getMonth() % 2 === 1) {
+        const nextMonth = new Date(cursor.getFullYear(), cursor.getMonth() + 1, 1);
+        const xStart = Math.max(0, xFor(cursor));
+        const xEnd = Math.min(timelineWidth, xFor(nextMonth));
+        const width = xEnd - xStart;
+        if (width > 0) {
+          monthBands.push({ key: `${cursor.getFullYear()}-${cursor.getMonth()}`, x: xStart, width });
+        }
+      }
+      cursor.setMonth(cursor.getMonth() + 1);
+    }
+  }
+
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-3">
       <div className="flex flex-wrap items-center gap-4">
@@ -315,10 +335,17 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
               {labelHeader}
             </div>
             <div className="relative h-8" style={{ width: timelineWidth }}>
+              {monthBands.map((band) => (
+                <div
+                  key={band.key}
+                  className="absolute top-0 z-0 h-full bg-gray-100"
+                  style={{ left: band.x, width: band.width }}
+                />
+              ))}
               {ticks.map((tick) => (
                 <div
                   key={tick.x}
-                  className="absolute top-0 flex h-full items-center border-l border-gray-200 pl-1.5 text-xs whitespace-nowrap text-gray-500"
+                  className="absolute top-0 z-10 flex h-full items-center border-l border-gray-200 pl-1.5 text-xs whitespace-nowrap text-gray-500"
                   style={{ left: tick.x }}
                 >
                   {tick.label}
@@ -329,9 +356,16 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
 
           <div className="relative">
             <div
-              className="pointer-events-none absolute top-0 bottom-0"
+              className="pointer-events-none absolute top-0 bottom-0 z-0"
               style={{ left: LABEL_WIDTH, width: timelineWidth }}
             >
+              {monthBands.map((band) => (
+                <div
+                  key={band.key}
+                  className="absolute top-0 bottom-0 bg-gray-50"
+                  style={{ left: band.x, width: band.width }}
+                />
+              ))}
               {ticks.map((tick) => (
                 <div
                   key={tick.x}
@@ -341,63 +375,65 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
               ))}
             </div>
 
-            {rowEntries.map((entry) => (
-              <div
-                key={entry.rowKey}
-                className="flex border-b border-gray-100 last:border-0 hover:bg-gray-50"
-                style={{ height: ROW_HEIGHT }}
-              >
+            <div className="relative z-10">
+              {rowEntries.map((entry) => (
                 <div
-                  className="sticky left-0 z-10 flex w-[220px] shrink-0 items-center truncate border-r border-gray-100 bg-white px-3 text-sm text-gray-700"
-                  title={entry.label}
+                  key={entry.rowKey}
+                  className="flex border-b border-gray-100 last:border-0 hover:bg-gray-50/70"
+                  style={{ height: ROW_HEIGHT }}
                 >
-                  {entry.label}
-                </div>
-                <div style={{ width: timelineWidth, height: ROW_HEIGHT }}>
-                  <svg width={timelineWidth} height={ROW_HEIGHT}>
-                    {entry.points.slice(1).map((point, i) => {
-                      const prev = entry.points[i];
-                      return (
-                        <line
-                          key={`${point.header}-seg`}
-                          x1={prev.x}
-                          y1={ROW_HEIGHT / 2}
-                          x2={point.x}
-                          y2={ROW_HEIGHT / 2}
-                          stroke={colorFor(point.header)}
-                          strokeWidth={LINE_WIDTH}
-                          strokeLinecap="round"
+                  <div
+                    className="sticky left-0 z-10 flex w-[220px] shrink-0 items-center truncate border-r border-gray-100 bg-white px-3 text-sm text-gray-700"
+                    title={entry.label}
+                  >
+                    {entry.label}
+                  </div>
+                  <div style={{ width: timelineWidth, height: ROW_HEIGHT }}>
+                    <svg width={timelineWidth} height={ROW_HEIGHT}>
+                      {entry.points.slice(1).map((point, i) => {
+                        const prev = entry.points[i];
+                        return (
+                          <line
+                            key={`${point.header}-seg`}
+                            x1={prev.x}
+                            y1={ROW_HEIGHT / 2}
+                            x2={point.x}
+                            y2={ROW_HEIGHT / 2}
+                            stroke={colorFor(point.header)}
+                            strokeWidth={LINE_WIDTH}
+                            strokeLinecap="round"
+                          />
+                        );
+                      })}
+                      {entry.points.map((point) => (
+                        <circle
+                          key={point.header}
+                          cx={point.x}
+                          cy={ROW_HEIGHT / 2}
+                          r={MARKER_R}
+                          fill={colorFor(point.header)}
+                          stroke="#ffffff"
+                          strokeWidth={2}
+                          onMouseEnter={(e) =>
+                            setHover({
+                              x: e.clientX,
+                              y: e.clientY,
+                              rowLabel: entry.label,
+                              header: point.header,
+                              dateLabel: formatDate(point.date),
+                            })
+                          }
+                          onMouseMove={(e) =>
+                            setHover((h) => (h ? { ...h, x: e.clientX, y: e.clientY } : h))
+                          }
+                          onMouseLeave={() => setHover(null)}
                         />
-                      );
-                    })}
-                    {entry.points.map((point) => (
-                      <circle
-                        key={point.header}
-                        cx={point.x}
-                        cy={ROW_HEIGHT / 2}
-                        r={MARKER_R}
-                        fill={colorFor(point.header)}
-                        stroke="#ffffff"
-                        strokeWidth={2}
-                        onMouseEnter={(e) =>
-                          setHover({
-                            x: e.clientX,
-                            y: e.clientY,
-                            rowLabel: entry.label,
-                            header: point.header,
-                            dateLabel: formatDate(point.date),
-                          })
-                        }
-                        onMouseMove={(e) =>
-                          setHover((h) => (h ? { ...h, x: e.clientX, y: e.clientY } : h))
-                        }
-                        onMouseLeave={() => setHover(null)}
-                      />
-                    ))}
-                  </svg>
+                      ))}
+                    </svg>
+                  </div>
                 </div>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       </div>

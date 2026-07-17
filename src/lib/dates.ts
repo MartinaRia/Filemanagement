@@ -65,3 +65,17 @@ export function guessLabelHeader(sourceHeaders: string[], dateHeaders: string[])
   );
   return byKeyword ?? candidates[0] ?? sourceHeaders[0] ?? "";
 }
+
+// Individua la colonna "Stato" (es. "Stato Pj") tra le sourceHeaders, per
+// popolare il filtro di stato nel Gantt. Ritorna null se non c'e' nulla che
+// somigli a una colonna di stato.
+export function findStatusHeader(sourceHeaders: string[]): string | null {
+  const norm = (s: string) => s.toLowerCase().replace(/[^a-z]/g, "");
+  const exact = sourceHeaders.find((h) => norm(h) === "statopj");
+  if (exact) return exact;
+  return (
+    sourceHeaders.find((h) => h.toLowerCase().includes("stato")) ??
+    sourceHeaders.find((h) => h.toLowerCase().includes("status")) ??
+    null
+  );
+}

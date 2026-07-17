@@ -71,6 +71,8 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
   const [statusFilter, setStatusFilter] = useState<string[]>([]);
   const [statusMenuOpen, setStatusMenuOpen] = useState(false);
   const statusMenuRef = useRef<HTMLDivElement>(null);
+  const [dateFilterHeader, setDateFilterHeader] = useState("");
+  const [dateFilterMonth, setDateFilterMonth] = useState("");
 
   useEffect(() => {
     if (!statusMenuOpen) return;
@@ -103,16 +105,29 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
     return rows.filter((row) => statusFilter.includes(row.source[statusHeader]?.trim() ?? ""));
   }, [rows, statusHeader, statusFilter]);
 
+  // Filtra ulteriormente per una colonna data che cade in un dato mese
+  // (es. "Avvio Sviluppi Actual" nel mese di settembre '26).
+  const filteredRows = useMemo(() => {
+    if (!dateFilterHeader || !dateFilterMonth) return visibleRows;
+    const [yearStr, monthStr] = dateFilterMonth.split("-");
+    const year = Number(yearStr);
+    const month = Number(monthStr);
+    return visibleRows.filter((row) => {
+      const d = parseFlexibleDate(row.source[dateFilterHeader] ?? "");
+      return d ? d.getFullYear() === year && d.getMonth() + 1 === month : false;
+    });
+  }, [visibleRows, dateFilterHeader, dateFilterMonth]);
+
   const allDates = useMemo(() => {
     const dates: Date[] = [];
-    for (const row of visibleRows) {
+    for (const row of filteredRows) {
       for (const header of dateHeaders) {
         const d = parseFlexibleDate(row.source[header] ?? "");
         if (d) dates.push(d);
       }
     }
     return dates;
-  }, [visibleRows, dateHeaders]);
+  }, [filteredRows, dateHeaders]);
 
   if (dateHeaders.length === 0) {
     return (
@@ -131,16 +146,25 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
   if (allDates.length === 0) {
     return (
       <div className="flex flex-1 flex-col gap-3">
-        <StatusFilter
-          statusHeader={statusHeader}
-          statusValues={statusValues}
-          statusFilter={statusFilter}
-          open={statusMenuOpen}
-          setOpen={setStatusMenuOpen}
-          toggle={toggleStatus}
-          clear={() => setStatusFilter([])}
-          menuRef={statusMenuRef}
-        />
+        <div className="flex flex-wrap items-center gap-4">
+          <StatusFilter
+            statusHeader={statusHeader}
+            statusValues={statusValues}
+            statusFilter={statusFilter}
+            open={statusMenuOpen}
+            setOpen={setStatusMenuOpen}
+            toggle={toggleStatus}
+            clear={() => setStatusFilter([])}
+            menuRef={statusMenuRef}
+          />
+          <DateFilter
+            dateHeaders={dateHeaders}
+            dateFilterHeader={dateFilterHeader}
+            setDateFilterHeader={setDateFilterHeader}
+            dateFilterMonth={dateFilterMonth}
+            setDateFilterMonth={setDateFilterMonth}
+          />
+        </div>
         <div className="flex flex-1 items-center justify-center rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">
           Nessuna riga con date valide per i filtri selezionati.
         </div>
@@ -159,7 +183,7 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
 
   const xFor = (d: Date) => daysBetween(minDate, d) * pxPerDay;
 
-  const rowEntries: RowEntry[] = visibleRows
+  const rowEntries: RowEntry[] = filteredRows
     .map((row) => {
       const points = dateHeaders
         .map((header) => {
@@ -177,7 +201,7 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
     .filter((entry) => entry.points.length > 0)
     .sort((a, b) => a.points[0].date.getTime() - b.points[0].date.getTime());
 
-  const skippedCount = visibleRows.length - rowEntries.length;
+  const skippedCount = filteredRows.length - rowEntries.length;
 
   const ticks: { x: number; label: string }[] = [];
   if (pxPerDay >= WEEKLY_TICK_THRESHOLD) {
@@ -229,6 +253,14 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
           toggle={toggleStatus}
           clear={() => setStatusFilter([])}
           menuRef={statusMenuRef}
+        />
+
+        <DateFilter
+          dateHeaders={dateHeaders}
+          dateFilterHeader={dateFilterHeader}
+          setDateFilterHeader={setDateFilterHeader}
+          dateFilterMonth={dateFilterMonth}
+          setDateFilterMonth={setDateFilterMonth}
         />
 
         <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -456,6 +488,62 @@ function StatusFilter({
             </button>
           )}
         </div>
+      )}
+    </div>
+  );
+}
+
+interface DateFilterProps {
+  dateHeaders: string[];
+  dateFilterHeader: string;
+  setDateFilterHeader: (v: string) => void;
+  dateFilterMonth: string;
+  setDateFilterMonth: (v: string) => void;
+}
+
+function DateFilter({
+  dateHeaders,
+  dateFilterHeader,
+  setDateFilterHeader,
+  dateFilterMonth,
+  setDateFilterMonth,
+}: DateFilterProps) {
+  const active = dateFilterHeader && dateFilterMonth;
+
+  return (
+    <div className="flex items-center gap-2 text-sm text-gray-600">
+      <span>Filtra per data:</span>
+      <select
+        value={dateFilterHeader}
+        onChange={(e) => setDateFilterHeader(e.target.value)}
+        className="rounded-md border border-gray-300 px-2 py-1 text-sm"
+      >
+        <option value="">Nessun filtro</option>
+        {dateHeaders.map((h) => (
+          <option key={h} value={h}>
+            {h}
+          </option>
+        ))}
+      </select>
+      {dateFilterHeader && (
+        <input
+          type="month"
+          value={dateFilterMonth}
+          onChange={(e) => setDateFilterMonth(e.target.value)}
+          className="rounded-md border border-gray-300 px-2 py-1 text-sm"
+        />
+      )}
+      {active && (
+        <button
+          type="button"
+          onClick={() => {
+            setDateFilterHeader("");
+            setDateFilterMonth("");
+          }}
+          className="text-xs text-gray-400 hover:text-gray-600"
+        >
+          Cancella
+        </button>
       )}
     </div>
   );

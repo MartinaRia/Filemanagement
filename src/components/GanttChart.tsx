@@ -879,6 +879,24 @@ function ColumnFilterRow({ label, values, terms, setTerms }: ColumnFilterRowProp
       {expanded && (
         <div className="mt-1 max-h-40 overflow-auto rounded border border-gray-100 p-1">
           {values.length === 0 && <p className="px-1 py-1 text-xs text-gray-400">Nessun valore</p>}
+          {values.length > 0 && (
+            <div className="mb-1 flex items-center gap-2 border-b border-gray-100 px-1 pb-1">
+              <button
+                type="button"
+                onClick={() => setTerms(values)}
+                className="text-[10px] text-blue-600 hover:text-blue-800"
+              >
+                Seleziona tutti
+              </button>
+              <button
+                type="button"
+                onClick={() => setTerms([])}
+                className="text-[10px] text-red-500 hover:text-red-700"
+              >
+                Cancella tutti
+              </button>
+            </div>
+          )}
           {values.map((value) => (
             <label
               key={value}

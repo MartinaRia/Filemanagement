@@ -7,7 +7,7 @@ import LogoutButton from "@/components/LogoutButton";
 export const dynamic = "force-dynamic";
 
 export default async function GanttPage() {
-  const [{ rows, sourceHeaders }, role] = await Promise.all([getMergedRows(), getCurrentRole()]);
+  const [{ rows, sourceHeaders, columnDefs }, role] = await Promise.all([getMergedRows(), getCurrentRole()]);
   const isAdmin = role === "admin";
 
   return (
@@ -38,7 +38,7 @@ export default async function GanttPage() {
         </div>
       </header>
 
-      <GanttChart rows={rows} sourceHeaders={sourceHeaders} />
+      <GanttChart rows={rows} sourceHeaders={sourceHeaders} columnDefs={columnDefs} />
     </main>
   );
 }

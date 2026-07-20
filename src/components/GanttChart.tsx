@@ -2,11 +2,18 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { detectDateHeaders, findStatusHeader, guessLabelHeader, parseFlexibleDate } from "@/lib/dates";
-import type { MergedRow } from "@/lib/types";
+import type { CustomColumnDef, MergedRow } from "@/lib/types";
 
 interface Props {
   rows: MergedRow[];
   sourceHeaders: string[];
+  columnDefs: CustomColumnDef[];
+}
+
+interface FilterColumn {
+  id: string;
+  label: string;
+  getValue: (row: MergedRow) => string;
 }
 
 // Palette categorica fissa (skill dataviz): l'ordine degli slot e' il
@@ -62,7 +69,7 @@ function formatDate(d: Date): string {
   return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-export default function GanttChart({ rows, sourceHeaders }: Props) {
+export default function GanttChart({ rows, sourceHeaders, columnDefs }: Props) {
   const dateHeaders = useMemo(() => detectDateHeaders(rows, sourceHeaders), [rows, sourceHeaders]);
   const statusHeader = useMemo(() => findStatusHeader(sourceHeaders), [sourceHeaders]);
   const [labelHeader, setLabelHeader] = useState(() => guessLabelHeader(sourceHeaders, dateHeaders));
@@ -74,6 +81,48 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
   const [dateFilterHeader, setDateFilterHeader] = useState("");
   const [dateFilterMonth, setDateFilterMonth] = useState("");
   const [labelSort, setLabelSort] = useState<"none" | "asc" | "desc">("none");
+  const [columnFilters, setColumnFilters] = useState<Record<string, string[]>>({});
+  const [filtersOpen, setFiltersOpen] = useState(false);
+
+  // Elenco di tutte le colonne (sorgente + personalizzate) disponibili anche
+  // in tabella: si adatta da solo al file caricato, nessun nome hardcoded.
+  const allColumns: FilterColumn[] = useMemo(() => {
+    const sourceCols: FilterColumn[] = sourceHeaders.map((header) => ({
+      id: `src:${header}`,
+      label: header,
+      getValue: (row) => row.source[header] ?? "",
+    }));
+    const customCols: FilterColumn[] = columnDefs.map((def) => ({
+      id: `custom:${def.key}`,
+      label: def.label,
+      getValue: (row) => String(row.custom[def.key] ?? ""),
+    }));
+    return [...sourceCols, ...customCols];
+  }, [sourceHeaders, columnDefs]);
+
+  const columnUniqueValues = useMemo(() => {
+    const result: Record<string, string[]> = {};
+    for (const col of allColumns) {
+      const values = new Set<string>();
+      for (const row of rows) {
+        const v = col.getValue(row).trim();
+        if (v) values.add(v);
+      }
+      result[col.id] = Array.from(values).sort((a, b) => a.localeCompare(b)).slice(0, 200);
+    }
+    return result;
+  }, [rows, allColumns]);
+
+  const activeColumnFilterCount = Object.values(columnFilters).filter((v) => v.length > 0).length;
+
+  function setColumnFilterTerms(columnId: string, terms: string[]) {
+    setColumnFilters((prev) => {
+      const next = { ...prev };
+      if (terms.length === 0) delete next[columnId];
+      else next[columnId] = terms;
+      return next;
+    });
+  }
 
   useEffect(() => {
     if (!statusMenuOpen) return;
@@ -119,16 +168,32 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
     });
   }, [visibleRows, dateFilterHeader, dateFilterMonth]);
 
+  // Filtri generici per colonna (stesso comportamento multi-termine/OR della
+  // tabella): combinati in AND tra loro e con i filtri stato/mese sopra.
+  const columnFilteredRows = useMemo(() => {
+    const active = Object.entries(columnFilters).filter(([, terms]) => terms.length > 0);
+    if (active.length === 0) return filteredRows;
+    const cols = new Map(allColumns.map((c) => [c.id, c]));
+    return filteredRows.filter((row) =>
+      active.every(([columnId, terms]) => {
+        const col = cols.get(columnId);
+        if (!col) return true;
+        const cell = col.getValue(row).toLowerCase();
+        return terms.some((term) => cell.includes(term.toLowerCase()));
+      })
+    );
+  }, [filteredRows, columnFilters, allColumns]);
+
   const allDates = useMemo(() => {
     const dates: Date[] = [];
-    for (const row of filteredRows) {
+    for (const row of columnFilteredRows) {
       for (const header of dateHeaders) {
         const d = parseFlexibleDate(row.source[header] ?? "");
         if (d) dates.push(d);
       }
     }
     return dates;
-  }, [filteredRows, dateHeaders]);
+  }, [columnFilteredRows, dateHeaders]);
 
   if (dateHeaders.length === 0) {
     return (
@@ -165,10 +230,23 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
             dateFilterMonth={dateFilterMonth}
             setDateFilterMonth={setDateFilterMonth}
           />
+          <FilterDrawerButton
+            activeCount={activeColumnFilterCount}
+            onClick={() => setFiltersOpen(true)}
+          />
         </div>
         <div className="flex flex-1 items-center justify-center rounded-lg border border-gray-200 bg-white p-8 text-center text-sm text-gray-500">
           Nessuna riga con date valide per i filtri selezionati.
         </div>
+        <ColumnFiltersDrawer
+          open={filtersOpen}
+          onClose={() => setFiltersOpen(false)}
+          columns={allColumns}
+          uniqueValues={columnUniqueValues}
+          filters={columnFilters}
+          setTerms={setColumnFilterTerms}
+          clearAll={() => setColumnFilters({})}
+        />
       </div>
     );
   }
@@ -184,7 +262,7 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
 
   const xFor = (d: Date) => daysBetween(minDate, d) * pxPerDay;
 
-  const rowEntries: RowEntry[] = filteredRows
+  const rowEntries: RowEntry[] = columnFilteredRows
     .map((row) => {
       const points = dateHeaders
         .map((header) => {
@@ -211,7 +289,7 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
     });
   }
 
-  const skippedCount = filteredRows.length - rowEntries.length;
+  const skippedCount = columnFilteredRows.length - rowEntries.length;
 
   const ticks: { x: number; label: string }[] = [];
   if (pxPerDay >= WEEKLY_TICK_THRESHOLD) {
@@ -307,6 +385,11 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
           setDateFilterHeader={setDateFilterHeader}
           dateFilterMonth={dateFilterMonth}
           setDateFilterMonth={setDateFilterMonth}
+        />
+
+        <FilterDrawerButton
+          activeCount={activeColumnFilterCount}
+          onClick={() => setFiltersOpen(true)}
         />
 
         <div className="flex items-center gap-2 text-sm text-gray-600">
@@ -479,6 +562,16 @@ export default function GanttChart({ rows, sourceHeaders }: Props) {
           </div>
         </div>
       )}
+
+      <ColumnFiltersDrawer
+        open={filtersOpen}
+        onClose={() => setFiltersOpen(false)}
+        columns={allColumns}
+        uniqueValues={columnUniqueValues}
+        filters={columnFilters}
+        setTerms={setColumnFilterTerms}
+        clearAll={() => setColumnFilters({})}
+      />
     </div>
   );
 }
@@ -606,6 +699,201 @@ function DateFilter({
         >
           Cancella
         </button>
+      )}
+    </div>
+  );
+}
+
+function FilterDrawerButton({
+  activeCount,
+  onClick,
+}: {
+  activeCount: number;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      className={`rounded-md border px-2 py-1 text-sm ${
+        activeCount > 0
+          ? "border-blue-300 bg-blue-50 text-blue-700"
+          : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+      }`}
+    >
+      Filtri colonne{activeCount > 0 ? ` (${activeCount})` : ""}
+    </button>
+  );
+}
+
+interface ColumnFiltersDrawerProps {
+  open: boolean;
+  onClose: () => void;
+  columns: FilterColumn[];
+  uniqueValues: Record<string, string[]>;
+  filters: Record<string, string[]>;
+  setTerms: (columnId: string, terms: string[]) => void;
+  clearAll: () => void;
+}
+
+// Pannello laterale con un filtro multi-termine per ogni colonna presente in
+// tabella (sorgente + personalizzate): si adatta al file caricato, non ha
+// colonne cablate nel codice.
+function ColumnFiltersDrawer({
+  open,
+  onClose,
+  columns,
+  uniqueValues,
+  filters,
+  setTerms,
+  clearAll,
+}: ColumnFiltersDrawerProps) {
+  if (!open) return null;
+
+  const activeCount = Object.values(filters).filter((v) => v.length > 0).length;
+
+  return (
+    <div className="fixed inset-0 z-40 flex justify-end">
+      <div className="absolute inset-0 bg-black/20" onClick={onClose} />
+      <div className="relative z-10 flex h-full w-80 flex-col gap-3 overflow-y-auto border-l border-gray-200 bg-white p-4 shadow-xl">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-semibold text-gray-800">Filtri colonne</h2>
+          <button
+            type="button"
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600"
+          >
+            ✕
+          </button>
+        </div>
+
+        {activeCount > 0 && (
+          <button
+            type="button"
+            onClick={clearAll}
+            className="self-start text-xs text-red-500 hover:text-red-700"
+          >
+            Cancella tutti i filtri colonna ({activeCount})
+          </button>
+        )}
+
+        {columns.length === 0 && (
+          <p className="text-xs text-gray-400">Nessuna colonna disponibile.</p>
+        )}
+
+        {columns.map((col) => (
+          <ColumnFilterRow
+            key={col.id}
+            label={col.label}
+            values={uniqueValues[col.id] ?? []}
+            terms={filters[col.id] ?? []}
+            setTerms={(terms) => setTerms(col.id, terms)}
+          />
+        ))}
+      </div>
+    </div>
+  );
+}
+
+interface ColumnFilterRowProps {
+  label: string;
+  values: string[];
+  terms: string[];
+  setTerms: (terms: string[]) => void;
+}
+
+function ColumnFilterRow({ label, values, terms, setTerms }: ColumnFilterRowProps) {
+  const [draft, setDraft] = useState("");
+  const [expanded, setExpanded] = useState(false);
+
+  function addTerms(raw: string) {
+    const parts = raw
+      .split(",")
+      .map((p) => p.trim())
+      .filter(Boolean);
+    if (parts.length === 0) return;
+    setTerms(Array.from(new Set([...terms, ...parts])));
+    setDraft("");
+  }
+
+  function removeTerm(term: string) {
+    setTerms(terms.filter((t) => t !== term));
+  }
+
+  function toggleValue(value: string) {
+    if (terms.includes(value)) removeTerm(value);
+    else setTerms([...terms, value]);
+  }
+
+  return (
+    <div className="border-b border-gray-100 pb-3">
+      <div className="mb-1 flex items-center justify-between gap-2">
+        <span className="truncate text-xs font-semibold text-gray-600" title={label}>
+          {label}
+        </span>
+        <button
+          type="button"
+          onClick={() => setExpanded((e) => !e)}
+          title="Scegli valori"
+          className={`shrink-0 text-xs ${
+            terms.length > 0 ? "text-blue-600" : "text-gray-300 hover:text-gray-500"
+          }`}
+        >
+          ▾
+        </button>
+      </div>
+
+      <input
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === "Enter") {
+            e.preventDefault();
+            addTerms(draft);
+          }
+        }}
+        placeholder="Filtra..."
+        className="w-full rounded border border-gray-200 px-1.5 py-1 text-xs focus:border-gray-400 focus:outline-none"
+      />
+
+      {terms.length > 0 && (
+        <div className="mt-1 flex flex-wrap gap-1">
+          {terms.map((t) => (
+            <span
+              key={t}
+              className="inline-flex items-center gap-1 rounded bg-blue-50 px-1 py-0.5 text-[10px] text-blue-700"
+            >
+              <span className="max-w-24 truncate">{t}</span>
+              <button
+                type="button"
+                onClick={() => removeTerm(t)}
+                className="text-blue-500 hover:text-blue-800"
+              >
+                ✕
+              </button>
+            </span>
+          ))}
+        </div>
+      )}
+
+      {expanded && (
+        <div className="mt-1 max-h-40 overflow-auto rounded border border-gray-100 p-1">
+          {values.length === 0 && <p className="px-1 py-1 text-xs text-gray-400">Nessun valore</p>}
+          {values.map((value) => (
+            <label
+              key={value}
+              className="flex cursor-pointer items-center gap-1.5 rounded px-1 py-1 text-xs text-gray-700 hover:bg-gray-50"
+            >
+              <input
+                type="checkbox"
+                checked={terms.includes(value)}
+                onChange={() => toggleValue(value)}
+                className="h-3.5 w-3.5"
+              />
+              <span className="truncate">{value}</span>
+            </label>
+          ))}
+        </div>
       )}
     </div>
   );

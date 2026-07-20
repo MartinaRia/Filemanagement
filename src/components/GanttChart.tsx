@@ -717,8 +717,8 @@ function FilterDrawerButton({
       onClick={onClick}
       className={`rounded-md border px-2 py-1 text-sm ${
         activeCount > 0
-          ? "border-blue-300 bg-blue-50 text-blue-700"
-          : "border-gray-300 bg-white text-gray-600 hover:bg-gray-50"
+          ? "border-blue-300 bg-blue-100 text-blue-800"
+          : "border-indigo-200 bg-indigo-50 text-indigo-700 hover:bg-indigo-100"
       }`}
     >
       Filtri colonne{activeCount > 0 ? ` (${activeCount})` : ""}

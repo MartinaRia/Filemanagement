@@ -22,7 +22,7 @@ export default async function GanttPage() {
         <div className="flex items-center gap-2">
           <Link
             href="/"
-            className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+            className="rounded-md border border-indigo-200 bg-indigo-50 px-3 py-1.5 text-sm font-medium text-indigo-700 hover:bg-indigo-100"
           >
             Tabella
           </Link>

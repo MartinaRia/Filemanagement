@@ -22,6 +22,8 @@ const COL = {
 const COL2 = {
   dominio: "Dominio",
   avvioAnalisi: "Avvio Analisi IT",
+  programmaCalcolato: "Programma Calcolato",
+  statoApprovazioneCalcolato: "Stato approvazione Calcolato",
 } as const;
 
 const FONT = "Arial";
@@ -67,9 +69,19 @@ async function getSheet1RowsWithKey(): Promise<{ rowKey: string; data: Record<st
   return rows.map((r) => ({ rowKey: r.rowKey, data: r.data as Record<string, string> }));
 }
 
+async function getSheet1ByKey(): Promise<Map<string, Record<string, string>>> {
+  const rows = await prisma.sourceRow.findMany();
+  return new Map(rows.map((r) => [r.rowKey, r.data as Record<string, string>]));
+}
+
 async function getSheet2ByKey(): Promise<Map<string, Record<string, string>>> {
   const rows = await prisma.sourceRow2.findMany();
   return new Map(rows.map((r) => [r.rowKey, r.data as Record<string, string>]));
+}
+
+async function getSheet2RowsWithKey(): Promise<{ rowKey: string; data: Record<string, string> }[]> {
+  const rows = await prisma.sourceRow2.findMany();
+  return rows.map((r) => ({ rowKey: r.rowKey, data: r.data as Record<string, string> }));
 }
 
 // Slide 3/4: progetti filtrati per RAG, esclusi quelli gia' rilasciati ("Live").
@@ -111,6 +123,154 @@ async function getTimelineRows(): Promise<TimelineRow[]> {
     });
   }
   return result;
+}
+
+// ---------------------------------------------------------------------------
+// Slide 5 — Overview Progetti (3 card riepilogative)
+// ---------------------------------------------------------------------------
+
+// Le sole 3 fasi "in pipeline" del processo di approvazione IT Board (le altre
+// possibili es. "Approvato Comitato Esecutivo"/"Carry Over"/"Non Approvato" sono
+// gia' decise e non compaiono in questa overview) — ordine confermato sul file
+// Excel reale, foglio "2.1_Pipeline proj. in approv.".
+const OVERVIEW_APPROVAL_STATES = ["Da Portare in IT Board", "Deroga", "In approvazione Comitato"] as const;
+const OVERVIEW_DOMINIO_ORDER = ["IT4BU", "IT4IT", "IT4REG"] as const;
+const OVERVIEW_EXEC_STATUS_ORDER = ["Da avviare", "Analysis", "Development", "Test/UAT"] as const;
+const OVERVIEW_EXCLUDED_STATUS = new Set(["Live", "Sospeso"]);
+
+interface OverviewGroup {
+  label: string;
+  rows: { label: string; count: number }[];
+}
+interface OverviewCard {
+  cardLabel: string;
+  total: number;
+  groups: OverviewGroup[];
+}
+
+async function getOverviewCards(): Promise<{ progetti: OverviewCard; strategici: OverviewCard; esecuzione: OverviewCard }> {
+  const [rows1, rows2WithKey, sheet1ByKey] = await Promise.all([getSheet1Rows(), getSheet2RowsWithKey(), getSheet1ByKey()]);
+
+  // Un progetto puo' comparire ancora come "Deroga"/ecc. sul foglio 1.2 (dato non
+  // aggiornato) pur essendo gia' Live/Sospeso sul foglio 1.1 — va escluso anche qui,
+  // stessa regola delle card 3/slide 3/4. Se non c'e' match su 1.1 (progetto non ancora
+  // in Execution) la riga resta inclusa: non abbiamo elementi per escluderla.
+  const rows2 = rows2WithKey
+    .filter(({ rowKey }) => {
+      const status = sheet1ByKey.get(rowKey)?.[COL.statusPj];
+      return status === undefined || !OVERVIEW_EXCLUDED_STATUS.has(status);
+    })
+    .map(({ data }) => data);
+
+  const buildApprovalCard = (programmaValue: string, cardLabel: string): OverviewCard => {
+    const filtered = rows2.filter((r) => (r[COL2.programmaCalcolato] ?? "") === programmaValue);
+    const groups: OverviewGroup[] = OVERVIEW_APPROVAL_STATES.map((state) => {
+      const byDominio = new Map<string, number>();
+      for (const r of filtered) {
+        if (r[COL2.statoApprovazioneCalcolato] !== state) continue;
+        const dominio = r[COL2.dominio] ?? "";
+        if (!dominio) continue;
+        byDominio.set(dominio, (byDominio.get(dominio) ?? 0) + 1);
+      }
+      const rows = OVERVIEW_DOMINIO_ORDER.filter((d) => (byDominio.get(d) ?? 0) > 0).map((d) => ({ label: d, count: byDominio.get(d)! }));
+      return { label: state, rows };
+    }).filter((g) => g.rows.length > 0);
+    const total = groups.reduce((sum, g) => sum + g.rows.reduce((s, r) => s + r.count, 0), 0);
+    return { cardLabel, total, groups };
+  };
+
+  const esecuzione: OverviewCard = (() => {
+    const counts = new Map<string, number>();
+    for (const r of rows1) {
+      const status = r[COL.statusPj] ?? "";
+      if (!status || OVERVIEW_EXCLUDED_STATUS.has(status)) continue;
+      counts.set(status, (counts.get(status) ?? 0) + 1);
+    }
+    const rows = OVERVIEW_EXEC_STATUS_ORDER.filter((s) => (counts.get(s) ?? 0) > 0).map((s) => ({ label: s, count: counts.get(s)! }));
+    const total = rows.reduce((sum, r) => sum + r.count, 0);
+    return { cardLabel: "PROGETTI IN ESECUZIONE", total, groups: rows.length ? [{ label: "Stato progetti", rows }] : [] };
+  })();
+
+  return {
+    progetti: buildApprovalCard("Progetti", "PROGETTI"),
+    strategici: buildApprovalCard("Programma strategico", "PROGETTI STRATEGICI"),
+    esecuzione,
+  };
+}
+
+// Geometria misurata sulla slide 5 originale del template (le 3 card condividono
+// esattamente lo stesso schema verticale, solo traslate orizzontalmente).
+const OVERVIEW_CARD_X_OFFSETS = [0, 5816575, 11633150];
+const OVERVIEW_CONTENT_X = 876300;
+const OVERVIEW_TEXT_WIDTH = 5392393; // larghezza box numero/etichetta card/header gruppo
+const OVERVIEW_PILL_WIDTH = 4902175;
+const OVERVIEW_PILL_RIGHT_PAD = 76200;
+const OVERVIEW_ROW_TEXT_INSET = 152400;
+const OVERVIEW_COUNT_Y = 2700338;
+const OVERVIEW_COUNT_H = 723900;
+const OVERVIEW_LABEL_Y = 3500438;
+const OVERVIEW_LABEL_H = 276225;
+const OVERVIEW_FIRST_HEADER_Y = 3967163;
+const OVERVIEW_HEADER_H = 252413;
+const OVERVIEW_GAP_HEADER_TO_PILL = 57149;
+const OVERVIEW_PILL_H = 423863;
+const OVERVIEW_ROW_PITCH = 500063;
+const OVERVIEW_ROW_GAP = OVERVIEW_ROW_PITCH - OVERVIEW_PILL_H;
+const OVERVIEW_GROUP_GAP = 190500;
+const OVERVIEW_PILL_RADIUS_IN = emuToIn(133385); // = raggio "adj" del roundRect originale (31461/100000 * min(w,h)/2)
+
+function renderOverviewCard(pSlide: IPptxGenJSSlide, xOffset: number, card: OverviewCard) {
+  const x = OVERVIEW_CONTENT_X + xOffset;
+
+  pSlide.addText(String(card.total), {
+    x: emuToIn(x), y: emuToIn(OVERVIEW_COUNT_Y), w: emuToIn(OVERVIEW_TEXT_WIDTH), h: emuToIn(OVERVIEW_COUNT_H),
+    fontFace: FONT, fontSize: 54, bold: true, color: "005F63", valign: "top",
+  } as never);
+  pSlide.addText(card.cardLabel, {
+    x: emuToIn(x), y: emuToIn(OVERVIEW_LABEL_Y), w: emuToIn(OVERVIEW_TEXT_WIDTH), h: emuToIn(OVERVIEW_LABEL_H),
+    fontFace: FONT, fontSize: 16.5, bold: true, color: "585858", valign: "top",
+  } as never);
+
+  let y = OVERVIEW_FIRST_HEADER_Y;
+  for (const group of card.groups) {
+    pSlide.addText(group.label, {
+      x: emuToIn(x), y: emuToIn(y), w: emuToIn(OVERVIEW_TEXT_WIDTH), h: emuToIn(OVERVIEW_HEADER_H),
+      fontFace: FONT, fontSize: 15, bold: true, color: "008085", valign: "top",
+    } as never);
+    y += OVERVIEW_HEADER_H + OVERVIEW_GAP_HEADER_TO_PILL;
+
+    for (const row of group.rows) {
+      pSlide.addShape("roundRect" as never, {
+        x: emuToIn(x), y: emuToIn(y), w: emuToIn(OVERVIEW_PILL_WIDTH), h: emuToIn(OVERVIEW_PILL_H),
+        fill: { color: "F2F5F7" }, line: { type: "none" }, rectRadius: OVERVIEW_PILL_RADIUS_IN,
+      } as never);
+      pSlide.addText(row.label, {
+        x: emuToIn(x + OVERVIEW_ROW_TEXT_INSET), y: emuToIn(y), w: emuToIn(OVERVIEW_PILL_WIDTH - OVERVIEW_ROW_TEXT_INSET), h: emuToIn(OVERVIEW_PILL_H),
+        fontFace: FONT, fontSize: 15, color: "2E3033", valign: "middle",
+      } as never);
+      pSlide.addText(String(row.count), {
+        x: emuToIn(x), y: emuToIn(y), w: emuToIn(OVERVIEW_PILL_WIDTH - OVERVIEW_PILL_RIGHT_PAD), h: emuToIn(OVERVIEW_PILL_H),
+        fontFace: FONT, fontSize: 15, bold: true, color: "2E3033", align: "right", valign: "middle",
+      } as never);
+      y += OVERVIEW_ROW_PITCH;
+    }
+    y = y - OVERVIEW_ROW_GAP + OVERVIEW_GROUP_GAP;
+  }
+}
+
+function renderOverviewSlide(
+  pSlide: IPptxGenJSSlide,
+  cards: { progetti: OverviewCard; strategici: OverviewCard; esecuzione: OverviewCard }
+) {
+  const today = new Date().toLocaleDateString("it-IT", { day: "2-digit", month: "long", year: "numeric" });
+  pSlide.addText(today, {
+    x: emuToIn(16089511), y: emuToIn(535781), w: emuToIn(1789688), h: emuToIn(300038),
+    fontFace: FONT, fontSize: 18, bold: true, color: "8E8E8E", align: "left",
+  } as never);
+
+  renderOverviewCard(pSlide, OVERVIEW_CARD_X_OFFSETS[0], cards.progetti);
+  renderOverviewCard(pSlide, OVERVIEW_CARD_X_OFFSETS[1], cards.strategici);
+  renderOverviewCard(pSlide, OVERVIEW_CARD_X_OFFSETS[2], cards.esecuzione);
 }
 
 // ---------------------------------------------------------------------------
@@ -426,12 +586,18 @@ export async function generateReportPptx(): Promise<Buffer> {
 
   const pres = automizer.loadRoot(TEMPLATE_FILE).load(TEMPLATE_FILE, "src");
 
-  const [ragRosso, ragGiallo, timelineRows] = await Promise.all([
+  const [ragRosso, ragGiallo, timelineRows, overviewCards] = await Promise.all([
     getRagRows("Rosso"),
     getRagRows("Giallo"),
     getTimelineRows(),
+    getOverviewCards(),
   ]);
 
+  // "Shape 28"/"Shape 47" sono gli sfondi statici (bordo) delle card 2/3: cadono
+  // nel range solo per ordine di dichiarazione nell'XML, vanno esclusi dalla rimozione.
+  const overviewShapeNames = (await getDynamicShapeNames(pres, 5, "Text 5", "Text 64")).filter(
+    (name) => name !== "Shape 28" && name !== "Shape 47"
+  );
   const rossoShapeNames = await getDynamicShapeNames(pres, 3, "Shape 12", "Text 65");
   const gialloShapeNames = await getDynamicShapeNames(pres, 4, "Shape 12", "Text 50");
   const timelineShapeNames = await getDynamicShapeNames(pres, 10, "Shape 21", "Shape 71");
@@ -453,6 +619,14 @@ export async function generateReportPptx(): Promise<Buffer> {
   }
 
   for (let slideNumber = 1; slideNumber <= 10; slideNumber++) {
+    if (slideNumber === 5) {
+      pres.addSlide("src", 5, (slide: ISlide) => {
+        slide.removeElement("Text 1");
+        overviewShapeNames.forEach((name) => slide.removeElement(name));
+        slide.generate((pSlide) => renderOverviewSlide(pSlide, overviewCards));
+      });
+      continue;
+    }
     if (slideNumber === 3) {
       rossoPages.forEach((pageRows, pageIndex) => {
         pres.addSlide("src", 3, (slide: ISlide) => {

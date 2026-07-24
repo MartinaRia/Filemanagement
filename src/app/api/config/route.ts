@@ -7,6 +7,7 @@ const ConfigSchema = z.object({
   keyColumn: z.string().optional().nullable(),
   worksheetName2: z.string().optional().nullable(),
   keyColumn2: z.string().optional().nullable(),
+  hiddenColumnsForViewer: z.array(z.string()).optional(),
 });
 
 export async function GET() {

@@ -215,5 +215,5 @@ export async function getMergedRows() {
     ? config.sourceHeaders
     : Array.from(new Set(rows.flatMap((r) => Object.keys(r.source))));
 
-  return { rows, columnDefs, sourceHeaders };
+  return { rows, columnDefs, sourceHeaders, hiddenColumnsForViewer: config?.hiddenColumnsForViewer ?? [] };
 }

@@ -9,14 +9,16 @@ interface AppConfig {
   keyColumn: string;
   worksheetName2: string;
   keyColumn2: string;
+  hiddenColumnsForViewer: string[];
 }
 
 interface Props {
   initialConfig: AppConfig;
   initialColumnDefs: CustomColumnDef[];
+  sourceHeaders: string[];
 }
 
-export default function SettingsForm({ initialConfig, initialColumnDefs }: Props) {
+export default function SettingsForm({ initialConfig, initialColumnDefs, sourceHeaders }: Props) {
   const [config, setConfig] = useState<AppConfig>(initialConfig);
   const [columnDefs, setColumnDefs] = useState<CustomColumnDef[]>(initialColumnDefs);
   const [saving, setSaving] = useState(false);
@@ -43,6 +45,15 @@ export default function SettingsForm({ initialConfig, initialColumnDefs }: Props
     } finally {
       setSaving(false);
     }
+  }
+
+  function toggleColumnVisibleForViewer(header: string, visible: boolean) {
+    setConfig((prev) => ({
+      ...prev,
+      hiddenColumnsForViewer: visible
+        ? prev.hiddenColumnsForViewer.filter((h) => h !== header)
+        : Array.from(new Set([...prev.hiddenColumnsForViewer, header])),
+    }));
   }
 
   async function handleAddColumn(e: React.FormEvent) {
@@ -127,6 +138,49 @@ export default function SettingsForm({ initialConfig, initialColumnDefs }: Props
           </button>
           {configMessage && <p className="text-sm text-gray-600">{configMessage}</p>}
         </form>
+      </section>
+
+      <section className="rounded-lg border border-gray-200 bg-white p-5">
+        <h2 className="mb-1 text-sm font-semibold">Colonne visibili ai Viewer</h2>
+        <p className="mb-4 text-xs text-gray-500">
+          Deseleziona le colonne del file Excel che non devono essere mostrate agli utenti Viewer nella Tabella.
+          Le colonne deselezionate spariscono anche dai filtri del Gantt (drawer &quot;Filtri colonne&quot;). Gli
+          amministratori vedono sempre tutte le colonne.
+        </p>
+
+        {sourceHeaders.length === 0 && (
+          <p className="text-sm text-gray-400">Nessuna colonna disponibile: carica prima un file Excel.</p>
+        )}
+
+        {sourceHeaders.length > 0 && (
+          <form onSubmit={handleSaveConfig} className="flex flex-col gap-3">
+            <ul className="grid grid-cols-2 gap-x-4 gap-y-1.5 sm:grid-cols-3">
+              {sourceHeaders.map((header) => (
+                <li key={header}>
+                  <label className="flex cursor-pointer items-center gap-1.5 text-sm text-gray-700">
+                    <input
+                      type="checkbox"
+                      checked={!config.hiddenColumnsForViewer.includes(header)}
+                      onChange={(e) => toggleColumnVisibleForViewer(header, e.target.checked)}
+                      className="h-3.5 w-3.5"
+                    />
+                    <span className="truncate" title={header}>
+                      {header}
+                    </span>
+                  </label>
+                </li>
+              ))}
+            </ul>
+            <button
+              type="submit"
+              disabled={saving}
+              className="mt-2 w-fit rounded-md bg-gray-900 px-4 py-2 text-sm font-medium text-white hover:bg-gray-700 disabled:opacity-50"
+            >
+              {saving ? "Salvataggio..." : "Salva"}
+            </button>
+            {configMessage && <p className="text-sm text-gray-600">{configMessage}</p>}
+          </form>
+        )}
       </section>
 
       <section className="rounded-lg border border-gray-200 bg-white p-5">

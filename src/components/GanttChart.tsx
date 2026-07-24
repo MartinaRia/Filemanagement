@@ -8,6 +8,9 @@ interface Props {
   rows: MergedRow[];
   sourceHeaders: string[];
   columnDefs: CustomColumnDef[];
+  // Colonne (per header sorgente) da escludere dal drawer "Filtri colonne":
+  // gia' risolto in base al ruolo dal chiamante (vuoto per gli admin).
+  hiddenColumns?: string[];
 }
 
 interface FilterColumn {
@@ -69,7 +72,7 @@ function formatDate(d: Date): string {
   return d.toLocaleDateString("it-IT", { day: "2-digit", month: "2-digit", year: "numeric" });
 }
 
-export default function GanttChart({ rows, sourceHeaders, columnDefs }: Props) {
+export default function GanttChart({ rows, sourceHeaders, columnDefs, hiddenColumns = [] }: Props) {
   const dateHeaders = useMemo(() => detectDateHeaders(rows, sourceHeaders), [rows, sourceHeaders]);
   const statusHeader = useMemo(() => findStatusHeader(sourceHeaders), [sourceHeaders]);
   const [labelHeader, setLabelHeader] = useState(() => guessLabelHeader(sourceHeaders, dateHeaders));
@@ -86,19 +89,24 @@ export default function GanttChart({ rows, sourceHeaders, columnDefs }: Props) {
 
   // Elenco di tutte le colonne (sorgente + personalizzate) disponibili anche
   // in tabella: si adatta da solo al file caricato, nessun nome hardcoded.
+  // Le colonne disattivate per i viewer dalle Impostazioni non compaiono qui,
+  // quindi restano fuori dal drawer "Filtri colonne" (il grafico Gantt in se'
+  // continua a usare tutte le colonne data di sourceHeaders).
   const allColumns: FilterColumn[] = useMemo(() => {
-    const sourceCols: FilterColumn[] = sourceHeaders.map((header) => ({
-      id: `src:${header}`,
-      label: header,
-      getValue: (row) => row.source[header] ?? "",
-    }));
+    const sourceCols: FilterColumn[] = sourceHeaders
+      .filter((header) => !hiddenColumns.includes(header))
+      .map((header) => ({
+        id: `src:${header}`,
+        label: header,
+        getValue: (row) => row.source[header] ?? "",
+      }));
     const customCols: FilterColumn[] = columnDefs.map((def) => ({
       id: `custom:${def.key}`,
       label: def.label,
       getValue: (row) => String(row.custom[def.key] ?? ""),
     }));
     return [...sourceCols, ...customCols];
-  }, [sourceHeaders, columnDefs]);
+  }, [sourceHeaders, columnDefs, hiddenColumns]);
 
   const columnUniqueValues = useMemo(() => {
     const result: Record<string, string[]> = {};

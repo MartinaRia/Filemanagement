@@ -18,7 +18,10 @@ export default async function HomePage() {
   ]);
   const isAdmin = role === "admin";
 
-  const { rows, columnDefs, sourceHeaders } = await getMergedRows();
+  const { rows, columnDefs, sourceHeaders, hiddenColumnsForViewer } = await getMergedRows();
+  const visibleSourceHeaders = isAdmin
+    ? sourceHeaders
+    : sourceHeaders.filter((h) => !hiddenColumnsForViewer.includes(h));
 
   if (!lastUpload) {
     if (!isAdmin) {
@@ -87,7 +90,7 @@ export default async function HomePage() {
         </div>
       </header>
 
-      <DataTable rows={rows} columnDefs={columnDefs} sourceHeaders={sourceHeaders} />
+      <DataTable rows={rows} columnDefs={columnDefs} sourceHeaders={visibleSourceHeaders} />
     </main>
   );
 }

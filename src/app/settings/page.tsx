@@ -17,8 +17,10 @@ export default async function SettingsPage() {
         keyColumn: config?.keyColumn ?? "",
         worksheetName2: config?.worksheetName2 ?? "",
         keyColumn2: config?.keyColumn2 ?? "",
+        hiddenColumnsForViewer: config?.hiddenColumnsForViewer ?? [],
       }}
       initialColumnDefs={columnDefs}
+      sourceHeaders={config?.sourceHeaders ?? []}
     />
   );
 }

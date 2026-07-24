@@ -7,8 +7,12 @@ import LogoutButton from "@/components/LogoutButton";
 export const dynamic = "force-dynamic";
 
 export default async function GanttPage() {
-  const [{ rows, sourceHeaders, columnDefs }, role] = await Promise.all([getMergedRows(), getCurrentRole()]);
+  const [{ rows, sourceHeaders, columnDefs, hiddenColumnsForViewer }, role] = await Promise.all([
+    getMergedRows(),
+    getCurrentRole(),
+  ]);
   const isAdmin = role === "admin";
+  const hiddenColumns = isAdmin ? [] : hiddenColumnsForViewer;
 
   return (
     <main className="mx-auto flex h-screen w-full min-w-0 max-w-7xl flex-col gap-4 p-6">
@@ -46,7 +50,12 @@ export default async function GanttPage() {
         </div>
       </header>
 
-      <GanttChart rows={rows} sourceHeaders={sourceHeaders} columnDefs={columnDefs} />
+      <GanttChart
+        rows={rows}
+        sourceHeaders={sourceHeaders}
+        columnDefs={columnDefs}
+        hiddenColumns={hiddenColumns}
+      />
     </main>
   );
 }

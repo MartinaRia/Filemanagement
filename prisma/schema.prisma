@@ -28,6 +28,10 @@ model AppConfig {
   // tra SourceRow e SourceRow2, permettendo il join tramite rowKey.
   worksheetName2 String?
   keyColumn2     String?
+  // Colonne sorgente (per header, come in sourceHeaders) nascoste agli utenti
+  // con ruolo "viewer" nella Tabella e nel drawer Filtri colonne del Gantt.
+  // Gli admin vedono sempre tutte le colonne.
+  hiddenColumnsForViewer String[] @default([])
   updatedAt      DateTime @updatedAt
 }
 

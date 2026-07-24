@@ -69,6 +69,14 @@ export default async function HomePage() {
           </Link>
           {isAdmin && (
             <Link
+              href="/report"
+              className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
+            >
+              Report PPT
+            </Link>
+          )}
+          {isAdmin && (
+            <Link
               href="/settings"
               className="rounded-md border border-gray-300 bg-white px-3 py-1.5 text-sm font-medium hover:bg-gray-50"
             >

@@ -22,7 +22,13 @@ model AppConfig {
   // nativo preserva l'ordine, a differenza delle chiavi di un oggetto jsonb (SourceRow.data),
   // che Postgres puo' riordinare. Usato per mostrare le colonne nell'ordine originale del file.
   sourceHeaders String[] @default([])
-  updatedAt     DateTime @updatedAt
+  // Secondo foglio opzionale (es. per il report PPT), che condivide la stessa chiave
+  // di join di "keyColumn" quando entrambe le colonne puntano alla stessa colonna
+  // logica (es. "Demand"): a parita' di valore grezzo, la rowKey calcolata coincide
+  // tra SourceRow e SourceRow2, permettendo il join tramite rowKey.
+  worksheetName2 String?
+  keyColumn2     String?
+  updatedAt      DateTime @updatedAt
 }
 
 // Definizione delle colonne custom (aggiunte dall'utente, a partire dalla colonna E)
@@ -41,6 +47,15 @@ model SourceRow {
   rowKey     String   @id
   rowIndex   Int // posizione originale nel foglio, per un ordinamento di default coerente
   data       Json // { "A": "...", "B": "...", ... } sola le colonne read-only
+  lastSeenAt DateTime @updatedAt
+  createdAt  DateTime @default(now())
+}
+
+// Snapshot del secondo foglio (stesso pattern di SourceRow), usato per il report PPT.
+model SourceRow2 {
+  rowKey     String   @id
+  rowIndex   Int
+  data       Json
   lastSeenAt DateTime @updatedAt
   createdAt  DateTime @default(now())
 }

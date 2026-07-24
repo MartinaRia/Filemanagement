@@ -15,6 +15,8 @@ export default async function SettingsPage() {
       initialConfig={{
         worksheetName: config?.worksheetName ?? "",
         keyColumn: config?.keyColumn ?? "",
+        worksheetName2: config?.worksheetName2 ?? "",
+        keyColumn2: config?.keyColumn2 ?? "",
       }}
       initialColumnDefs={columnDefs}
     />

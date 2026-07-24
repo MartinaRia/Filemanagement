@@ -7,6 +7,8 @@ import type { CustomColumnDef } from "@/lib/types";
 interface AppConfig {
   worksheetName: string;
   keyColumn: string;
+  worksheetName2: string;
+  keyColumn2: string;
 }
 
 interface Props {
@@ -102,6 +104,18 @@ export default function SettingsForm({ initialConfig, initialColumnDefs }: Props
             placeholder="A"
             value={config.keyColumn}
             onChange={(v) => setConfig({ ...config, keyColumn: v })}
+          />
+          <Field
+            label="Secondo foglio (opzionale, es. per il report PPT)"
+            placeholder="Foglio2"
+            value={config.worksheetName2}
+            onChange={(v) => setConfig({ ...config, worksheetName2: v })}
+          />
+          <Field
+            label="Colonna identificativa del secondo foglio (deve corrispondere alla stessa chiave del primo, es. A)"
+            placeholder="A"
+            value={config.keyColumn2}
+            onChange={(v) => setConfig({ ...config, keyColumn2: v })}
           />
 
           <button

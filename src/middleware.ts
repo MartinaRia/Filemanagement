@@ -4,7 +4,7 @@ import { getSession, SESSION_COOKIE_NAME } from "@/lib/session";
 const PUBLIC_PATHS = ["/login", "/api/login", "/api/logout"];
 
 // Percorsi non accessibili al ruolo "viewer" (accesso limitato a tabella e Gantt).
-const ADMIN_ONLY_PATHS = ["/settings", "/api/config", "/api/upload"];
+const ADMIN_ONLY_PATHS = ["/settings", "/api/config", "/api/upload", "/report", "/api/report"];
 
 export async function middleware(req: NextRequest) {
   const { pathname } = req.nextUrl;

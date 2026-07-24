@@ -15,6 +15,7 @@
     "@tanstack/react-table": "^8.21.3",
     "exceljs": "^4.4.0",
     "next": "16.2.10",
+    "pptx-automizer": "^0.8.2",
     "prisma": "^6.19.3",
     "react": "19.2.4",
     "react-dom": "19.2.4",

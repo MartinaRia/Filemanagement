@@ -5,6 +5,8 @@ import { z } from "zod";
 const ConfigSchema = z.object({
   worksheetName: z.string().optional().nullable(),
   keyColumn: z.string().optional().nullable(),
+  worksheetName2: z.string().optional().nullable(),
+  keyColumn2: z.string().optional().nullable(),
 });
 
 export async function GET() {

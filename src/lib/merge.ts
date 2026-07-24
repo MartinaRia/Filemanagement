@@ -135,6 +135,33 @@ export async function applyUploadedWorkbook(
       update: { sourceHeaders: snapshot.headers },
     });
 
+    // Secondo foglio opzionale (es. per il report PPT): stesso identico pattern
+    // upsert/prune del foglio principale, solo su SourceRow2.
+    if (config?.worksheetName2) {
+      const snapshot2 = await parseWorkbookBuffer(buffer, config.worksheetName2);
+      const seenKeys2: string[] = [];
+
+      await prisma.$transaction(
+        snapshot2.rows.map((values, rowIndex) => {
+          const rowKey = computeRowKey(values, config.keyColumn2);
+          seenKeys2.push(rowKey);
+          const data: Record<string, string> = {};
+          snapshot2.headers.forEach((h, i) => {
+            data[h || `col_${i}`] = values[i] ?? "";
+          });
+          return prisma.sourceRow2.upsert({
+            where: { rowKey },
+            create: { rowKey, rowIndex, data },
+            update: { rowIndex, data },
+          });
+        })
+      );
+
+      await prisma.sourceRow2.deleteMany({
+        where: { rowKey: { notIn: seenKeys2.length ? seenKeys2 : ["__none__"] } },
+      });
+    }
+
     await prisma.uploadLog.update({
       where: { id: log.id },
       data: { status: "ok", rowCount: snapshot.rows.length, finishedAt: new Date() },

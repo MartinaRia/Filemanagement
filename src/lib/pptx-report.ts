@@ -10,6 +10,7 @@ const COL = {
   demand: "Demand",
   area: "Area",
   titolo: "Titolo progetto",
+  pm: "PM",
   commentiPpt: "Commenti per ppt",
   rag: "RAG",
   statusPj: "Status Pj",
@@ -39,6 +40,7 @@ const TEMPLATE_FILE = "report-template.pptx";
 interface RagRow {
   area: string;
   titolo: string;
+  pm: string;
   commenti: string;
 }
 
@@ -78,6 +80,7 @@ async function getRagRows(rag: "Rosso" | "Giallo"): Promise<RagRow[]> {
     .map((r) => ({
       area: r[COL.area] ?? "",
       titolo: r[COL.titolo] ?? "",
+      pm: r[COL.pm] ?? "",
       commenti: r[COL.commentiPpt] ?? "",
     }));
 }
@@ -212,7 +215,7 @@ function renderRagSlide(
     const cellCommon = { y: textY, h: rowH - emuToIn(95250) * 2, fontFace: FONT, fontSize: 15, valign: "top" };
     pSlide.addText(row.area, { ...cellCommon, x: RAG_LAYOUT.cols.dominio.textX, w: RAG_LAYOUT.cols.dominio.textW, color: "4F4F4F" } as never);
     pSlide.addText(row.titolo, { ...cellCommon, x: RAG_LAYOUT.cols.progetto.textX, w: RAG_LAYOUT.cols.progetto.textW, color: "2E3033", bold: true } as never);
-    pSlide.addText("", { ...cellCommon, x: RAG_LAYOUT.cols.pm.textX, w: RAG_LAYOUT.cols.pm.textW, color: "4F4F4F" } as never);
+    pSlide.addText(row.pm, { ...cellCommon, x: RAG_LAYOUT.cols.pm.textX, w: RAG_LAYOUT.cols.pm.textW, color: "4F4F4F" } as never);
     pSlide.addText(row.commenti, { ...cellCommon, x: RAG_LAYOUT.cols.issue.textX, w: RAG_LAYOUT.cols.issue.textW, color: "4F4F4F" } as never);
     pSlide.addText("", { ...cellCommon, x: RAG_LAYOUT.cols.owner.textX, w: RAG_LAYOUT.cols.owner.textW, color: "4F4F4F" } as never);
     pSlide.addText("", { ...cellCommon, x: RAG_LAYOUT.cols.due.textX, w: RAG_LAYOUT.cols.due.textW, color: "4F4F4F" } as never);
